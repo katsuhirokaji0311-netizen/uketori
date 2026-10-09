@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>受け取り管理帳</title>
+<style>
+  :root{
+    --paper:#FAF8F3;
+    --paper-line:#E4DFD3;
+    --ink:#2B2A28;
+    --ink-soft:#6B6660;
+    --stamp:#2C3E66;
+    --stamp-soft:#5A6C93;
+    --done:#3F6B4F;
+    --done-bg:#E7EFE8;
+    --partial:#8A6D1E;
+    --partial-bg:#F3ECD6;
+    --wait:#A2551E;
+    --wait-bg:#F5E9DC;
+    --danger:#A23E3E;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Hiragino Mincho ProN","Yu Mincho",serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .sheet{ max-width:420px; margin:0 auto; padding:28px 20px 40px; }
+  .ledger-header{
+    display:flex; justify-content:space-between; align-items:flex-start;
+    border-bottom:2px solid var(--ink); padding-bottom:12px; margin-bottom:6px;
+  }
+  .ledger-title{ font-size:20px; letter-spacing:0.08em; margin:0; }
+  .ledger-sub{ font-family:-apple-system,"Hiragino Sans",sans-serif; font-size:11px; color:var(--ink-soft); margin:2px 0 0; }
+  .edit-toggle{
+    font-family:-apple-system,"Hiragino Sans",sans-serif; font-size:12px; color:var(--stamp);
+    background:none; border:1px solid var(--stamp-soft); border-radius:14px; padding:6px 12px;
+    cursor:pointer; white-space:nowrap; margin-top:2px;
+  }
+  .edit-toggle.active{ background:var(--stamp); color:#fff; }
+  .month-nav{ display:flex; align-items:center; justify-content:center; gap:18px; margin:22px 0 4px; font-family:-apple-system,"Hiragino Sans",sans-serif; }
+  .month-nav button{ background:none; border:1px solid var(--paper-line); border-radius:50%; width:34px; height:34px; font-size:16px; color:var(--stamp); cursor:pointer; }
+  .month-nav button:active{ background:var(--paper-line); }
+  .month-label{ font-size:22px; min-width:150px; text-align:center; letter-spacing:0.03em; }
+  .month-label .yr{ font-size:14px; color:var(--ink-soft); margin-right:4px; }
+  .summary{ text-align:center; font-family:-apple-system,"Hiragino Sans",sans-serif; font-size:12px; color:var(--ink-soft); margin:2px 0 4px; }
+  .summary .total{ font-size:15px; color:var(--ink); display:block; margin-top:2px; }
+  .row{ padding:14px 4px; border-bottom:1px solid var(--paper-line); font-family:-apple-system,"Hiragino Sans",sans-serif; }
+  .row:last-child{ border-bottom:none; }
+  .row-top{ display:flex; align-items:center; gap:10px; }
+  .row-bottom{ display:flex; align-items:center; gap:8px; margin-top:8px; }
+  .row-checks{ display:flex; gap:16px; margin-top:10px; flex-wrap:wrap; }
+  .check-group{ display:flex; align-items:center; gap:7px; }
+  .check-group-label{ font-size:12.5px; color:var(--ink-soft); }
+  .item-name{ flex:1; font-size:15px; }
+  .item-name-input{ flex:1; font-size:15px; font-family:-apple-system,"Hiragino Sans",sans-serif; border:1px solid var(--paper-line); border-radius:6px; padding:8px 10px; background:#fff; color:var(--ink); }
+  .status-tag{ font-size:11px; padding:3px 9px; border-radius:11px; white-space:nowrap; }
+  .status-tag.done{ background:var(--done-bg); color:var(--done); }
+  .status-tag.partial{ background:var(--partial-bg); color:var(--partial); }
+  .status-tag.wait{ background:var(--wait-bg); color:var(--wait); }
+  .check{ width:24px; height:24px; flex:0 0 24px; border:1.5px solid var(--ink-soft); border-radius:4px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:15px; color:transparent; transition:background 0.15s, border-color 0.15s, color 0.15s; }
+  .check.on{ background:var(--done); border-color:var(--done); color:#fff; }
+  .check.on.confirm{ background:var(--stamp); border-color:var(--stamp); }
+  .yen-label{ font-size:13px; color:var(--ink-soft); }
+  .amount-input{ width:110px; font-size:14px; padding:7px 9px; border:1px solid var(--paper-line); border-radius:6px; background:#fff; color:var(--ink); font-family:-apple-system,"Hiragino Sans",sans-serif; text-align:right; }
+  .amount-hint{ font-size:11px; color:var(--ink-soft); }
+  .delete-btn{ flex:0 0 26px; width:26px; height:26px; border-radius:50%; border:1px solid var(--danger); color:var(--danger); background:none; font-size:14px; line-height:1; cursor:pointer; }
+  .add-row{ display:flex; flex-direction:column; gap:8px; padding:16px 4px 4px; font-family:-apple-system,"Hiragino Sans",sans-serif; }
+  .add-row .fields{ display:flex; gap:8px; }
+  .add-row input{ font-size:14px; padding:9px 11px; border:1px solid var(--paper-line); border-radius:6px; background:#fff; color:var(--ink); font-family:-apple-system,"Hiragino Sans",sans-serif; }
+  .add-row .name-input{ flex:1; }
+  .add-row .amount-input{ width:110px; }
+  .add-row button{ background:var(--stamp); color:#fff; border:none; border-radius:6px; padding:9px 14px; font-size:13px; cursor:pointer; white-space:nowrap; }
+  .add-row button:disabled{ background:var(--paper-line); color:var(--ink-soft); }
+  .note{ margin-top:26px; font-family:-apple-system,"Hiragino Sans",sans-serif; font-size:11.5px; color:var(--ink-soft); line-height:1.7; border-top:1px dashed var(--paper-line); padding-top:14px; }
+  .save-flag{ text-align:center; font-family:-apple-system,"Hiragino Sans",sans-serif; font-size:11px; color:var(--stamp-soft); height:16px; margin-top:4px; }
+  .setup-warning{ background:#FBEAEA; color:#A23E3E; font-family:-apple-system,"Hiragino Sans",sans-serif; font-size:12px; padding:12px; border-radius:8px; margin-bottom:16px; line-height:1.6; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div id="setupWarning"></div>
+  <div class="ledger-header">
+    <div>
+      <p class="ledger-title">受け取り管理帳</p>
+      <p class="ledger-sub">桃子（入金）・久美子（確認）のダブルチェック</p>
+    </div>
+    <button class="edit-toggle" id="editToggle">項目を編集</button>
+  </div>
+
+  <div class="month-nav">
+    <button id="prevBtn" aria-label="前の月">‹</button>
+    <div class="month-label" id="monthLabel"></div>
+    <button id="nextBtn" aria-label="次の月">›</button>
+  </div>
+  <div class="summary" id="summaryText"></div>
+
+  <div id="itemList"></div>
+  <div id="addRowWrap"></div>
+
+  <div class="save-flag" id="saveFlag"></div>
+
+  <div class="note">
+    各項目に「桃子：入金」「久美子：確認」の2つのチェックがあります。桃子さんが渡した（入金した）ら入金チェック、久美子さんが受け取ったことを確認したら確認チェックを付けてください。両方揃うと「確認済み」になります。データはGoogleスプレッドシートに保存され、数秒ごとに自動で同期されます。
+  </div>
+</div>
+
+<script>
+/* ▼▼▼ ここに、デプロイしたGoogle Apps Script の「ウェブアプリURL」を貼り付けてください ▼▼▼ */
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzNVB--UjrSgV4h4JcLMYQCyWLHiGl_K9Y5MWPiITkLcLrcsWeUGRkHGOZERW46qxZ0/exec";
+/* ▲▲▲ ここまで ▲▲▲ */
+
+const ITEMS_KEY = "receipts:items";
+const PAYER_NAME = "桃子";
+const RECEIVER_NAME = "久美子";
+const DEFAULT_ITEMS = [
+  { id: "rent", name: "家賃", defaultAmount: "" },
+  { id: "utilities", name: "水道光熱費", defaultAmount: "" },
+  { id: "property_tax", name: "固定資産税", defaultAmount: "" },
+  { id: "car_insurance", name: "自動車保険", defaultAmount: "" }
+];
+
+let current = new Date();
+current.setDate(1);
+let items = [];
+let editing = false;
+let currentState = {};
+
+function monthKey(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,"0");
+  return `receipts:${y}-${m}`;
+}
+function newId(){ return "item_" + Date.now() + "_" + Math.floor(Math.random()*1000); }
+function formatYen(v){
+  const n = Number(String(v).replace(/[^0-9]/g, ""));
+  if(!v || isNaN(n) || n === 0) return "";
+  return n.toLocaleString("ja-JP");
+}
+
+async function storageGet(key){
+  if(!GAS_URL || GAS_URL.indexOf("PUT_YOUR_WEB_APP_URL_HERE") >= 0) return null;
+  try{
+    const res = await fetch(`${GAS_URL}?action=get&key=${encodeURIComponent(key)}`);
+    const data = await res.json();
+    return data.value;
+  }catch(e){ return null; }
+}
+async function storageSet(key, value){
+  if(!GAS_URL || GAS_URL.indexOf("PUT_YOUR_WEB_APP_URL_HERE") >= 0) return false;
+  const flag = document.getElementById("saveFlag");
+  try{
+    await fetch(GAS_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "set", key, value })
+    });
+    flag.textContent = "保存しました";
+    setTimeout(()=>{ flag.textContent = ""; }, 1200);
+    return true;
+  }catch(e){
+    flag.textContent = "保存に失敗しました。もう一度お試しください。";
+    return false;
+  }
+}
+
+function checkSetup(){
+  const warn = document.getElementById("setupWarning");
+  if(!GAS_URL || GAS_URL.indexOf("PUT_YOUR_WEB_APP_URL_HERE") >= 0){
+    warn.innerHTML = '<div class="setup-warning">設定が未完了です。index.html内の GAS_URL に、Google Apps Scriptで発行したウェブアプリのURLを貼り付けてください。</div>';
+    return false;
+  }
+  warn.innerHTML = "";
+  return true;
+}
+
+async function loadItems(){
+  const raw = await storageGet(ITEMS_KEY);
+  if(raw){
+    try{
+      const parsed = JSON.parse(raw);
+      if(Array.isArray(parsed) && parsed.length > 0){
+        return parsed.map(i => ({ id: i.id, name: i.name, defaultAmount: i.defaultAmount || "" }));
+      }
+    }catch(e){}
+  }
+  return DEFAULT_ITEMS.map(i => ({...i}));
+}
+async function saveItems(){ await storageSet(ITEMS_KEY, JSON.stringify(items)); }
+
+function renderMonthLabel(d){
+  const y = d.getFullYear();
+  const m = d.getMonth()+1;
+  document.getElementById("monthLabel").innerHTML = `<span class="yr">${y}年</span>${m}月`;
+}
+
+async function loadState(d){
+  const raw = await storageGet(monthKey(d));
+  if(raw){
+    try{ return JSON.parse(raw); }catch(e){}
+  }
+  return {};
+}
+async function saveState(d, state){ await storageSet(monthKey(d), JSON.stringify(state)); }
+
+function getEntry(itemId){
+  const item = items.find(i => i.id === itemId);
+  const existing = currentState[itemId];
+  if(existing) return existing;
+  return { paid: false, confirmed: false, amount: item ? (item.defaultAmount || "") : "" };
+}
+
+function renderAddRow(){
+  const wrap = document.getElementById("addRowWrap");
+  wrap.innerHTML = "";
+  if(!editing) return;
+  const row = document.createElement("div");
+  row.className = "add-row";
+  const fields = document.createElement("div");
+  fields.className = "fields";
+  const nameInput = document.createElement("input");
+  nameInput.className = "name-input";
+  nameInput.type = "text";
+  nameInput.placeholder = "新しい項目名（例：管理費）";
+  nameInput.maxLength = 30;
+  const amountInput = document.createElement("input");
+  amountInput.className = "amount-input";
+  amountInput.type = "text";
+  amountInput.inputMode = "numeric";
+  amountInput.placeholder = "目安金額（円）";
+  const btn = document.createElement("button");
+  btn.textContent = "追加";
+  btn.disabled = true;
+  nameInput.addEventListener("input", () => { btn.disabled = nameInput.value.trim().length === 0; });
+  btn.onclick = async () => {
+    const name = nameInput.value.trim();
+    if(!name) return;
+    const amt = amountInput.value.replace(/[^0-9]/g, "");
+    items.push({ id: newId(), name, defaultAmount: amt });
+    await saveItems();
+    nameInput.value = ""; amountInput.value = ""; btn.disabled = true;
+    renderItems();
+  };
+  fields.appendChild(nameInput); fields.appendChild(amountInput);
+  row.appendChild(fields); row.appendChild(btn);
+  wrap.appendChild(row);
+}
+
+function statusInfo(entry){
+  if(entry.confirmed) return { cls: "done", label: "確認済み" };
+  if(entry.paid) return { cls: "partial", label: "入金済み・確認待ち" };
+  return { cls: "wait", label: "未入金" };
+}
+
+function renderItems(){
+  const list = document.getElementById("itemList");
+  list.innerHTML = "";
+  let confirmedCount = 0;
+  let total = 0;
+
+  items.forEach(item => {
+    const entry = getEntry(item.id);
+    if(entry.confirmed){
+      confirmedCount++;
+      total += Number(String(entry.amount).replace(/[^0-9]/g, "")) || 0;
+    }
+    const row = document.createElement("div");
+    row.className = "row";
+    const top = document.createElement("div");
+    top.className = "row-top";
+
+    if(editing){
+      const nameInput = document.createElement("input");
+      nameInput.className = "item-name-input";
+      nameInput.value = item.name;
+      nameInput.maxLength = 30;
+      nameInput.onblur = async () => {
+        const val = nameInput.value.trim();
+        if(val && val !== item.name){ item.name = val; await saveItems(); renderItems(); }
+        else { nameInput.value = item.name; }
+      };
+      const delBtn = document.createElement("button");
+      delBtn.className = "delete-btn";
+      delBtn.textContent = "×";
+      delBtn.onclick = async () => {
+        items = items.filter(i => i.id !== item.id);
+        await saveItems(); renderItems();
+      };
+      top.appendChild(nameInput); top.appendChild(delBtn);
+      row.appendChild(top);
+
+      const bottom = document.createElement("div");
+      bottom.className = "row-bottom";
+      const hint = document.createElement("span");
+      hint.className = "amount-hint"; hint.textContent = "目安金額";
+      const defAmountInput = document.createElement("input");
+      defAmountInput.className = "amount-input";
+      defAmountInput.type = "text"; defAmountInput.inputMode = "numeric";
+      defAmountInput.value = formatYen(item.defaultAmount);
+      defAmountInput.placeholder = "未設定";
+      defAmountInput.onblur = async () => {
+        item.defaultAmount = defAmountInput.value.replace(/[^0-9]/g, "");
+        await saveItems(); renderItems();
+      };
+      const yen = document.createElement("span");
+      yen.className = "yen-label"; yen.textContent = "円";
+      bottom.appendChild(hint); bottom.appendChild(defAmountInput); bottom.appendChild(yen);
+      row.appendChild(bottom);
+    } else {
+      const name = document.createElement("div");
+      name.className = "item-name"; name.textContent = item.name;
+      const info = statusInfo(entry);
+      const tag = document.createElement("div");
+      tag.className = "status-tag " + info.cls; tag.textContent = info.label;
+      top.appendChild(name); top.appendChild(tag);
+      row.appendChild(top);
+
+      const bottom = document.createElement("div");
+      bottom.className = "row-bottom";
+      const yenLabel = document.createElement("span");
+      yenLabel.className = "yen-label"; yenLabel.textContent = "金額";
+      const amountInput = document.createElement("input");
+      amountInput.className = "amount-input";
+      amountInput.type = "text"; amountInput.inputMode = "numeric";
+      amountInput.placeholder = "0";
+      amountInput.value = formatYen(entry.amount);
+      amountInput.onblur = async () => {
+        const cleaned = amountInput.value.replace(/[^0-9]/g, "");
+        const e = getEntry(item.id);
+        currentState[item.id] = { paid: e.paid, confirmed: e.confirmed, amount: cleaned };
+        renderItems();
+        await saveState(current, currentState);
+      };
+      const yen2 = document.createElement("span");
+      yen2.className = "yen-label"; yen2.textContent = "円";
+      bottom.appendChild(yenLabel); bottom.appendChild(amountInput); bottom.appendChild(yen2);
+      row.appendChild(bottom);
+
+      const checks = document.createElement("div");
+      checks.className = "row-checks";
+      const payGroup = document.createElement("div");
+      payGroup.className = "check-group";
+      const payCheck = document.createElement("div");
+      payCheck.className = "check" + (entry.paid ? " on" : "");
+      payCheck.textContent = "✓";
+      payCheck.onclick = async () => {
+        const e = getEntry(item.id);
+        currentState[item.id] = { paid: !e.paid, confirmed: e.confirmed, amount: e.amount };
+        renderItems();
+        await saveState(current, currentState);
+      };
+      const payLabel = document.createElement("span");
+      payLabel.className = "check-group-label"; payLabel.textContent = `${PAYER_NAME}：入金`;
+      payGroup.appendChild(payCheck); payGroup.appendChild(payLabel);
+
+      const confirmGroup = document.createElement("div");
+      confirmGroup.className = "check-group";
+      const confirmCheck = document.createElement("div");
+      confirmCheck.className = "check confirm" + (entry.confirmed ? " on" : "");
+      confirmCheck.textContent = "✓";
+      confirmCheck.onclick = async () => {
+        const e = getEntry(item.id);
+        currentState[item.id] = { paid: e.paid, confirmed: !e.confirmed, amount: e.amount };
+        renderItems();
+        await saveState(current, currentState);
+      };
+      const confirmLabel = document.createElement("span");
+      confirmLabel.className = "check-group-label"; confirmLabel.textContent = `${RECEIVER_NAME}：確認`;
+      confirmGroup.appendChild(confirmCheck); confirmGroup.appendChild(confirmLabel);
+
+      checks.appendChild(payGroup); checks.appendChild(confirmGroup);
+      row.appendChild(checks);
+    }
+    list.appendChild(row);
+  });
+
+  const summaryEl = document.getElementById("summaryText");
+  if(editing){
+    summaryEl.innerHTML = `${items.length} 件の項目`;
+  } else {
+    summaryEl.innerHTML = `${confirmedCount} / ${items.length} 件、確認済み` +
+      `<span class="total">合計 ${total.toLocaleString("ja-JP")} 円</span>`;
+  }
+  renderAddRow();
+}
+
+async function goToMonth(d){
+  current = new Date(d);
+  renderMonthLabel(current);
+  document.getElementById("itemList").innerHTML = '<div class="summary">読み込み中…</div>';
+  currentState = await loadState(current);
+  renderItems();
+}
+
+document.getElementById("prevBtn").onclick = () => { const d = new Date(current); d.setMonth(d.getMonth()-1); goToMonth(d); };
+document.getElementById("nextBtn").onclick = () => { const d = new Date(current); d.setMonth(d.getMonth()+1); goToMonth(d); };
+document.getElementById("editToggle").onclick = () => {
+  editing = !editing;
+  const btn = document.getElementById("editToggle");
+  btn.classList.toggle("active", editing);
+  btn.textContent = editing ? "編集を終了" : "項目を編集";
+  renderItems();
+};
+
+let syncing = false;
+async function syncFromServer(){
+  if(syncing || editing || !checkSetup()) return;
+  const active = document.activeElement;
+  if(active && active.tagName === "INPUT") return;
+  syncing = true;
+  try{
+    const newItems = await loadItems();
+    const newState = await loadState(current);
+    const changed = JSON.stringify(newItems) !== JSON.stringify(items) ||
+                    JSON.stringify(newState) !== JSON.stringify(currentState);
+    if(changed){ items = newItems; currentState = newState; renderItems(); }
+  }catch(e){}
+  syncing = false;
+}
+
+(async function init(){
+  checkSetup();
+  items = await loadItems();
+  await goToMonth(current);
+  setInterval(syncFromServer, 6000);
+})();
+</script>
+</body>
+</html>
