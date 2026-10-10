@@ -153,11 +153,10 @@ async function storageSet(key, value){
   if(!GAS_URL || GAS_URL.indexOf("PUT_YOUR_WEB_APP_URL_HERE") >= 0) return false;
   const flag = document.getElementById("saveFlag");
   try{
-    await fetch(GAS_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "set", key, value })
-    });
+    const url = `${GAS_URL}?action=set&key=${encodeURIComponent(key)}&value=${encodeURIComponent(value)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if(!data || !data.ok) throw new Error("save failed");
     flag.textContent = "保存しました";
     setTimeout(()=>{ flag.textContent = ""; }, 1200);
     return true;
